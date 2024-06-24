@@ -1,4 +1,4 @@
 
 
-.\venv\Scripts\activate
-PY .\All_in_One_Sorten.py
+#.\venv\Scripts\activate
+PY .\All_in_One_Test.py

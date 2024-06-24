@@ -46,37 +46,23 @@ def read_files(path: str, tag: str):
         df = hp.read_file(file, dec='.', sepi=',')[['RT(milliseconds)', 'TIC']]
         x = df['RT(milliseconds)']
         y = df['TIC']
-        
-        areas = []
-        
-        for i in range(len(x)):
-            if i == 0:
-                 area = 0
-                 areas.append(area) # Set area to 0 for the first data point
-            else:
-                area = ((x[i] - x[i-1]) * (y[i] + y[i-1]) / 2)
-                areas.append(area)
-        
-        df['Area'] = areas
-        total_area = sum(df['Area'])
-        df['Normalised Area'] = (df['Area']/total_area)*1000
-        
-        df = df.drop(['TIC', 'Area',], axis=1)
-        
+        y = hp.smooth_spectrum(y)
+        y = hp.baseline_correction(y)
+        y = hp.area_normalization(x,y)
+
+      
         x_values = df['RT(milliseconds)']
-        y_values = df['Normalised Area'].rolling(window=7).mean()
-        df = pd.DataFrame({'RT(milliseconds)': x_values, 'Normalised Area': y_values})
+        y_values = df['TIC'].rolling(window=3).mean()
+        df = pd.DataFrame({'RT(milliseconds)': x_values, 'TIC': y_values})
         
         
         df.set_index('RT(milliseconds)', inplace=True)
         new_index = np.arange(120000, 823100, 100)
         df = df.reindex(new_index)
         
-        
-
         merged_df = pd.merge(merged_df, df, how='outer', left_index=True, right_index=True)
         merged_df = merged_df.fillna(0)
-        merged_df = merged_df.rename(columns={'Normalised Area': file.split('\\')[5]})
+        merged_df = merged_df.rename(columns={'TIC': file.split('\\')[5]})
 
         info.append(
             {'Class': file.split('\\')[5], 'filename': os.path.basename(file)})
@@ -86,7 +72,7 @@ def read_files(path: str, tag: str):
 
     df_info = pd.DataFrame(info)
     
-    threshold_percent = 0.1 # threshold in %
+    threshold_percent = 0 # threshold in %
     
     max_value = merged_df.max().max()
     threshold = max_value * (threshold_percent / 100)

@@ -3,8 +3,16 @@ from os import listdir,  scandir
 from os.path import isfile, join
 from pathlib import Path
 from shutil import rmtree
+import matplotlib.pyplot as plt
+import matplotlib.colors as mcolors
+from matplotlib.markers import MarkerStyle
+from scipy.signal import savgol_filter, find_peaks
+from scipy import sparse
+from scipy.sparse.linalg import spsolve
+from scipy import integrate
 import pandas as pd
 import os
+import numpy as np
 
 
 class Helpers:
@@ -133,3 +141,107 @@ class Helpers:
         path = join(path, f'{name}.csv')
         print(path)
         df.to_csv(path, sep=';', decimal=',', index=index)
+
+        # Smoothing the spectrum using Savitzky-Golay filter
+    def smooth_spectrum(y, window_length=11, polyorder=3):
+        return savgol_filter(y, window_length, polyorder)
+
+    # Baseline correction using asymmetric least squares smoothing
+    def baseline_correction(y, lam=1e6, p=0.001, niter=10):
+        L = len(y)
+        D = sparse.diags([1,-2,1],[0,-1,-2], shape=(L,L-2))
+        D = lam * D.dot(D.transpose()) # Precompute this term since it does not depend on `w`
+        w = np.ones(L)
+        W = sparse.spdiags(w, 0, L, L)
+        for i in range(niter):
+            W.setdiag(w) # Do not create a new matrix, just update diagonal values
+            Z = W + D
+            z = spsolve(Z, w*y)
+            w = p * (y > z) + (1-p) * (y < z)
+        return z
+
+    # Normalization of the spectrum to total area
+    def area_normalization(x, y):
+        cumulative_area = []
+        normalized_area = []
+        for i in range(len(x)):
+                if i == 0:
+                    area = 0
+                    cumulative_area.append(area) # Set area to 0 for the first data point
+                else:
+                    area = ((x[i] - x[i-1]) * (y[i] + y[i-1]) / 2)
+                    cumulative_area.append(area)
+        
+        total_area = sum(cumulative_area)
+        normalized_area = (cumulative_area/total_area)*100
+        return normalized_area
+
+
+    # Integration of the spectrum
+    def integrate_spectrum(x, y, peaks):
+        peak_areas = []
+        for peak in peaks:
+            left = max(0, peak - 15)
+            right = min(len(y), peak + 15)
+            area = integrate.trapezoid(y[left:right], x[left:right])
+            peak_areas.append(area)
+        return peak_areas
+
+    # Peak picking
+    def pick_peaks(y, height=None, prominence=0.02, distance=25):
+        peaks, _ = find_peaks(y, prominence=prominence)
+        return peaks
+    
+    def check_unique(df, column_name, bin_interval):
+    # Ensure each bin contains only one value
+        unique_bins = df['bin'].value_counts()
+        while any(unique_bins > 1):
+            for bin_value in unique_bins[unique_bins > 1].index:
+                indices = df[df['bin'] == bin_value].index
+                for idx in range(len(indices) - 1, 0, -1):
+                    current_value = df.at[indices[idx], column_name]
+                    previous_value = df.at[indices[idx - 1], column_name]
+                    if current_value - bin_value < bin_interval / 2 and previous_value - bin_value < bin_interval / 2:
+                        # Both values are closer to the lower edge, move the first value
+                        new_bin_value = bin_value - bin_interval # if bin_value - bin_interval in bins else bin_value + bin_interval
+                        df.at[indices[idx - 1], 'bin'] = new_bin_value
+                    elif current_value - bin_value >= bin_interval / 2 and previous_value - bin_value >= bin_interval / 2:
+                        # Both values are closer to the upper edge, move the second value
+                        new_bin_value = bin_value + bin_interval # if bin_value + bin_interval in bins else bin_value - bin_interval
+                        df.at[indices[idx], 'bin'] = new_bin_value
+                    else:
+                        # Move the closer value accordingly
+                        if abs(current_value - (bin_value + bin_interval / 2)) < abs(previous_value - (bin_value - bin_interval / 2)):
+                            new_bin_value = bin_value + bin_interval # if bin_value + bin_interval in bins else bin_value - bin_interval
+                            df.at[indices[idx], 'bin'] = new_bin_value
+                        else:
+                            new_bin_value = bin_value - bin_interval # if bin_value - bin_interval in bins else bin_value + bin_interval
+                            df.at[indices[idx - 1], 'bin'] = new_bin_value
+        unique_bins = df['bin'].value_counts()
+        return unique_bins
+
+
+    def bin_data(df, column_index, bin_interval):
+        # Get the column name based on the index
+        column_name = df.columns[column_index]
+        
+        # Determine the min and max values for binning
+        min_value = 2.20
+        max_value = df[column_name].max()
+        
+        # Create bin edges
+        # bins = np.arange(min_value, max_value + bin_interval, bin_interval)
+        bins = np.arange(start=min_value, stop=np.ceil(max_value*10)/10 + bin_interval, step=bin_interval)
+        print(bins)
+
+        # Assign each value to a bin
+        # df['bin'] = pd.cut(df[column_name], bins=bins, labels=bins[:-1], include_lowest=True)
+        df['bin'] = pd.cut(df[column_name], bins=bins, labels=bins[:-1], right=False, include_lowest=True).astype(float).round(2)
+        print(df['bin'])
+        
+        check_unique(df, column_name, bin_interval)
+        
+        # Round the bin values to 2 decimal places
+        df['bin'] = df['bin'].astype(float).round(2)
+        
+        return df
