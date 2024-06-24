@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 import plotly.express as px
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
-from sklearn.discriminant_analysis import LinearDiscriminantAnalysis as LDA, QuadraticDiscriminantAnalysis as QDA
+from sklearn.discriminant_analysis import LinearDiscriminantAnalysis as LDA
 from sklearn.metrics import classification_report
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score
@@ -17,13 +17,16 @@ from sklearn.metrics import confusion_matrix
 from sklearn.model_selection import cross_val_score
 
 
+
+
+
 # Choose the path for your data
 
-path_train = 'C:\\Users\\sverme-adm\\Desktop\\Paper'
-save_path_train = 'C:\\Users\\sverme-adm\\Desktop\\results_inf_ges'
+path_train = 'C:\\Users\\sverme-adm\\Desktop\\Sorten'
+save_path_train = 'C:\\Users\\sverme-adm\\Desktop\\results_Sorten'
 
-path_test = 'C:\\Users\\sverme-adm\\Desktop\\Paper_Test'
-save_path_test = 'C:\\Users\\sverme-adm\\Desktop\\results_Paper'
+path_test = 'C:\\Users\\sverme-adm\\Desktop\\Sorten_Test'
+save_path_test = 'C:\\Users\\sverme-adm\\Desktop\\results_Sorten'
 
 eval_ts = datetime.now().strftime("_%m-%d-%Y_%H-%M-%S")
 os.environ["ROOT_PATH"] = hp.mkdir_ifnotexits(
@@ -31,8 +34,8 @@ os.environ["ROOT_PATH"] = hp.mkdir_ifnotexits(
 
 # Choose your components for LDA and PCA
 
-components_LDA = 3
-
+components_LDA = 1
+components_PCA = 11
 
 # Get all files for your data set, merge them in on DataFrame and save the DataFrame to CSV
 
@@ -44,77 +47,83 @@ def read_files(path: str, tag: str):
 
     for file in files:
         df = hp.read_file(file, dec='.', sepi=',')[['RT(milliseconds)', 'TIC']]
-        x = df['RT(milliseconds)']
-        y = df['TIC']
-        
-        areas = []
-        
-        for i in range(len(x)):
-            if i == 0:
-                 area = 0
-                 areas.append(area) # Set area to 0 for the first data point
-            else:
-                area = ((x[i] - x[i-1]) * (y[i] + y[i-1]) / 2)
-                areas.append(area)
-        
-        df['Area'] = areas
-        total_area = sum(df['Area'])
-        df['Normalised Area'] = (df['Area']/total_area)*1000
-        
-        df = df.drop(['TIC', 'Area',], axis=1)
-        
-        x_values = df['RT(milliseconds)']
-        y_values = df['Normalised Area'].rolling(window=7).mean()
-        df = pd.DataFrame({'RT(milliseconds)': x_values, 'Normalised Area': y_values})
-        
-        
         df.set_index('RT(milliseconds)', inplace=True)
-        new_index = np.arange(120000, 823100, 100)
+        new_index = np.arange(120000, 832200, 100)
         df = df.reindex(new_index)
+        df = df.interpolate(method='linear',limit_direction='forward', axis=0)
         
-        
+        merged_df = pd.merge(
+            merged_df, df, how='outer', left_index=True, right_index=True)
 
-        merged_df = pd.merge(merged_df, df, how='outer', left_index=True, right_index=True)
         merged_df = merged_df.fillna(0)
-        merged_df = merged_df.rename(columns={'Normalised Area': file.split('\\')[5]})
+        merged_df = merged_df.rename(
+            columns={'TIC': file.split('\\')[5]})
 
         info.append(
             {'Class': file.split('\\')[5], 'filename': os.path.basename(file)})
 
-    merged_df.drop(merged_df.index[6601:], inplace=True)
-    merged_df.drop(merged_df.index[:600], inplace=True)
-
     df_info = pd.DataFrame(info)
     
-    threshold_percent = 0.1 # threshold in %
-    
-    max_value = merged_df.max().max()
-    threshold = max_value * (threshold_percent / 100)
-    
+    threshold = 10
     merged_df[merged_df <= threshold] = 0
-    
     
     hp.save_df(merged_df, join(
         os.environ["ROOT_PATH"], 'data'), f'extracted_features_{tag}')
     hp.save_df(df_info, join(
         os.environ["ROOT_PATH"], 'data'), f'extracted_features_info_{tag}')
-   
     
 
-# Perform classification with LDA on your reduced Training DataFrame (PCA DataFrame)
+# Perform Data Reduction with PCA on your Training DataFrame
 
-def create_lda(path_merged_data_train: str, path_merged_data_train_info: str):
+def create_pca(path_merged_data_train: str, path_merged_data_train_info: str):
     df = pd.read_csv(path_merged_data_train, decimal=',', sep=';')
     df_info = pd.read_csv(path_merged_data_train_info, decimal=',', sep=';')
     df.set_index('RT(milliseconds)', inplace=True)
-    df = df.T
-    X = df.values
-    df.set_index(df_info['Class'], inplace=True)
-    y = df.index
-   
+    pca = PCA(n_components=components_PCA).fit(df.T)
+
+    principalComponents = pca.transform(df.T)
+
+    df_PCA = pd.DataFrame(data=principalComponents, columns=[
+        f'PC{i+1}' for i in range(components_PCA)])
+    df_PCA.set_index(df_info['Class'], inplace=True)
+    df_PCA.to_csv('PC.csv', index=False)
+
+    # Normalize explained variance to get variance ratios
+    
+    variance_ratio = pca.explained_variance_ratio_
+
+    # Print the percentage of variance explained by each PC
+    
+    for i, ratio in enumerate(variance_ratio):
+        print(f"PC{i + 1}: {ratio * 100:.2f}%")
+        
+    # Print the sum of all the percentages
+        
+    total_variance = np.sum(variance_ratio)   
+    print(f"Total variance explained: {total_variance * 100:.2f}%")
+    
+    # plot the Loadings for each PC 
+    
+    pca_loadings = pca.components_
+    loadings_df = pd.DataFrame(data=pca_loadings.T, columns=[f'PC{i+1}' for i in range(len(pca_loadings))])
+    for column in loadings_df.columns:
+        
+        fig = px.line(loadings_df, x=df.index/60000, y=column, title=f"{column} Plot")
+        fig.update_xaxes(title_text='RT / min',tickmode='linear', dtick=0.5)
+        fig.update_traces(marker=dict(size=4))
+        # Save the plot as an HTML file
+        fig.write_html(f"{column}_plot_KuP.html")
+
+    print("Interactive plots saved.")
+    
+    return pca, df_PCA, df_info
+
+# Perform classification with LDA on your reduced Training DataFrame (PCA DataFrame)
+
+def create_lda(df_pca: pd.DataFrame, df_info: pd.DataFrame):
+    X = df_pca.values
+    y = df_pca.index
     name = df_info['filename']
-    
-    
     lda = LDA(n_components=components_LDA).fit(X, y)
     X_lda = lda.fit_transform(X, y)
     dfLDA_train = pd.DataFrame(data=X_lda, columns=[
@@ -122,9 +131,13 @@ def create_lda(path_merged_data_train: str, path_merged_data_train_info: str):
     dfLDA_train['file'] = name
     dfLDA_train.index = y
 
-    lda_likelihood = lda.score(X, y)
-
-    # Perform Cross Validation on your LDA (Get confusion matrix)
+    # Get your most influential PCs
+    
+    lda_loadings = lda.coef_
+    most_influential_pcs = sorted(range(components_PCA), key=lambda x: abs(lda_loadings[0][x]), reverse=True)
+    print(most_influential_pcs)
+    
+    # Perform Cross Validaion on your LDA (Get confusion matrix)
        
     y_pred = lda.predict(X)
     cm = confusion_matrix(y, y_pred)
@@ -145,54 +158,39 @@ def create_lda(path_merged_data_train: str, path_merged_data_train_info: str):
     cbar = ax.figure.colorbar(ax.collections[0])
     cbar.set_ticks([0, 0.2, 0.4, 0.6, 0.8, 1])
     cbar.set_ticklabels(["0%",'20%', '40%', '60%', '80%', "100%"])
-    ax.xaxis.set_ticklabels(df.index.unique().tolist(), fontsize=10)
-    ax.yaxis.set_ticklabels(df.index.unique().tolist(), fontsize=10)
+    ax.xaxis.set_ticklabels(df_pca.index.unique().tolist(), fontsize=10)
+    ax.yaxis.set_ticklabels(df_pca.index.unique().tolist(), fontsize=10)
     plt.show()
     
-    cv_scores = cross_val_score(lda, X, y, cv=10)
-    print("Average cross-validation score:", cv_scores.mean())
-    
-    lda_loadings = lda.scalings_
-    
-    
-    loadings_df = pd.DataFrame(data=lda_loadings, columns=[f'LD{i+1}' for i in range(lda_loadings.shape[1])])
-    loadings_df.set_index(np.arange(180000, 780100, 100), inplace=True)
-    print(loadings_df)
-    
-    loadings_df.to_csv('Scalings.csv')
+    return lda, dfLDA_train
 
-    for column in loadings_df.columns:
-        
-        fig = px.line(loadings_df, x=loadings_df.index/60000, y=column, title=f"{column} Plot")
-        fig.update_xaxes(title_text='RT / min',tickmode='linear', dtick=0.5)
-        fig.update_traces(marker=dict(size=4))
-        # Save the plot as an HTML file
-        fig.write_html(f"{column}_Scaling_Sorten.html")
+# Perform Data Reduction for your Test DataFrame with the PCA of the Training DataFrame
 
-    print("Interactive plots saved.")
-    
-    return lda, dfLDA_train, df_info
-
-
-# Perform classification for your reduced test DataFrame with the LDA of the Training DataFrame
-
-def push_to_lda(lda: LDA , path_merged_data_test: str, path_merged_data_test_info: str,):
+def push_to_pca(pca: PCA, path_merged_data_test: str, path_merged_data_test_info: str):
     df = pd.read_csv(path_merged_data_test, decimal=',', sep=';')
     df_info = pd.read_csv(path_merged_data_test_info, decimal=',', sep=';')
     df.set_index('RT(milliseconds)', inplace=True)
-    df = df.T
-    df.set_index(df_info['Class'], inplace=True)
-    predictions = lda.predict(df.values)
-    transformed_data_lda = lda.transform(df.values)
-    name = df_info['filename']
+    transformed_data = pca.transform(df.T)
+    dfPCA_test = pd.DataFrame(data=transformed_data, columns=[
+        f'PC{i+1}' for i in range(components_PCA)], index=df_info['Class'])
+ 
+    return dfPCA_test, df_info
+
+# Perform classification for your reduced test DataFrame with the LDA of the Training DataFrame
+
+def push_to_lda(lda: LDA, transformed_data: pd.DataFrame, transformed_data_info: pd.DataFrame):
+    predictions = lda.predict(transformed_data.values)
+    transformed_data_lda = lda.transform(transformed_data.values)
+    name = transformed_data_info['filename']
 
     df_lda_test_transformed = pd.DataFrame(data=transformed_data_lda, columns=[
         f'LD{i+1}' for i in range(components_LDA)])
     df_lda_test_transformed['file'] = name
-    df_lda_test_transformed.index = df.index
+    df_lda_test_transformed.index = transformed_data.index
     
     return df_lda_test_transformed, predictions
 
+# Combine the Training and Test DataFrames
 
 def combine_data(df_test: pd.DataFrame, df_train: pd.DataFrame):
     df_test['Dataset'] = ['test' for _ in df_test.index]
@@ -203,8 +201,8 @@ def combine_data(df_test: pd.DataFrame, df_train: pd.DataFrame):
 # Plot the LDA and save the Plot
 
 def plot(df: pd.DataFrame):
-    fig = px.scatter_3d(df, x='LD1', y='LD2' , z='LD3', color=df.index, hover_name='file', symbol='Dataset', symbol_sequence= ['circle', 'diamond'])
-    fig.update_traces(marker=dict(size=5,
+    fig = px.scatter(df, x='LD1',  color=df.index, hover_name='file', symbol='Dataset', symbol_sequence= ['circle', 'x'])
+    fig.update_traces(marker=dict(size=12,
                               line=dict(width=2,
                                         color='DarkSlateGrey')),
                   selector=dict(mode='markers'))
@@ -214,7 +212,7 @@ def plot(df: pd.DataFrame):
 # Plot the PCA and save the Plot
     
 def plot_PCA(df: pd.DataFrame):
-    fig = px.scatter_3d(df, x='PC1', y='PC2', z='PC3', color=df.index, symbol='Dataset', symbol_sequence= ['circle', 'diamond'])
+    fig = px.scatter_3d(df, x='PC1', y='PC2', z='PC3', color=df.index, symbol='Dataset', symbol_sequence= ['circle', 'x'])
     fig.update_traces(marker=dict(size=12,
                               line=dict(width=2,
                                         color='DarkSlateGrey')),
@@ -238,17 +236,25 @@ if __name__ == '__main__':
 
     # create PCA with Training DataFrame
     
-    lda, df_lda_train, df_info = create_lda(join(
-         os.environ["ROOT_PATH"], 'data', f'extracted_features_train.csv'),
-         join(
-         os.environ["ROOT_PATH"], 'data', f'extracted_features_info_train.csv'))
+    pca, df_pca, df_info = create_pca(join(
+        os.environ["ROOT_PATH"], 'data', f'extracted_features_train.csv'),
+        join(
+        os.environ["ROOT_PATH"], 'data', f'extracted_features_info_train.csv'))
     
-    # # perform PCA with Test DataFrame
+    # create LDA with Training DataFrame
     
-    df_lda_test, predictions = push_to_lda(lda, join(
-         os.environ["ROOT_PATH"], 'data', f'extracted_features_test.csv'),
-         join(
-         os.environ["ROOT_PATH"], 'data', f'extracted_features_info_test.csv'))
+    lda, df_lda_train = create_lda(df_pca, df_info)
+    
+    # perform PCA with Test DataFrame
+    
+    transformded_data_test, df_info_test = push_to_pca(pca, join(
+        os.environ["ROOT_PATH"], 'data', f'extracted_features_test.csv'),
+        join(
+        os.environ["ROOT_PATH"], 'data', f'extracted_features_info_test.csv'))
+    
+    # perform LDA with test DataFrame
+    
+    df_lda_test, predictions = push_to_lda(lda, transformded_data_test, df_info_test)
     
     # Combine both LDA DataFrames
     
@@ -260,7 +266,7 @@ if __name__ == '__main__':
     
     # combine both PCA DataFrames
     
-    # merged_pc = combine_data(transformded_data_test, df_pca)
+    merged_pc = combine_data(transformded_data_test, df_pca)
     
     # plot PCA
     
