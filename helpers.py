@@ -239,7 +239,7 @@ class Helpers:
         df['bin'] = pd.cut(df[column_name], bins=bins, labels=bins[:-1], right=False, include_lowest=True).astype(float).round(2)
         print(df['bin'])
         
-        check_unique(df, column_name, bin_interval)
+        Helpers.check_unique(df, column_name, bin_interval)
         
         # Round the bin values to 2 decimal places
         df['bin'] = df['bin'].astype(float).round(2)

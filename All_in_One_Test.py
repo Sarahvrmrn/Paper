@@ -52,7 +52,7 @@ def read_files(path: str, tag: str):
 
       
         x_values = df['RT(milliseconds)']
-        y_values = df['TIC'].rolling(window=3).mean()
+        y_values = df['TIC'].rolling(window=25).mean()
         df = pd.DataFrame({'RT(milliseconds)': x_values, 'TIC': y_values})
         
         
