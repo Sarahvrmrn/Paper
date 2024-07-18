@@ -49,10 +49,10 @@ def shift_retentiontime(input_dir, shift_value, output_csv_dir):
         print(f"Modified CSV saved to {output_csv_path}")
 
 # select input and output directories
-input_dir = 'C:\\Users\\sverme-adm\\Desktop\\Paper_Test'
-output_csv_dir = 'C:\\Users\\sverme-adm\\Desktop\\Data_Sorten'
+input_dir = 'C:\\Users\\sverme-adm\\Desktop\\Knolle'
+output_csv_dir = 'C:\\Users\\sverme-adm\\Desktop\\Data_Sorten\\Knolle'
 
-shift_value = 300      # shift the retention time (first column) by this value 
+shift_value = -300      # shift the retention time (first column) by this value 
 
 # execute function
 shift_retentiontime(input_dir, shift_value, output_csv_dir)

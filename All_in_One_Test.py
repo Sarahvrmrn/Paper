@@ -19,11 +19,11 @@ from sklearn.model_selection import cross_val_score
 
 # Choose the path for your data
 
-path_train = 'C:\\Users\\sverme-adm\\Desktop\\Paper'
-save_path_train = 'C:\\Users\\sverme-adm\\Desktop\\results_inf_ges'
+path_train = 'C:\\Users\\sverme-adm\\Desktop\\Knolle'
+save_path_train = 'C:\\Users\\sverme-adm\\Desktop\\res_Knolle'
 
-path_test = 'C:\\Users\\sverme-adm\\Desktop\\Paper_Test'
-save_path_test = 'C:\\Users\\sverme-adm\\Desktop\\results_Paper'
+path_test = 'C:\\Users\\sverme-adm\\Desktop\\Knolle_Test'
+save_path_test = 'C:\\Users\\sverme-adm\\Desktop\\res_Knolle'
 
 eval_ts = datetime.now().strftime("_%m-%d-%Y_%H-%M-%S")
 os.environ["ROOT_PATH"] = hp.mkdir_ifnotexits(
@@ -31,7 +31,7 @@ os.environ["ROOT_PATH"] = hp.mkdir_ifnotexits(
 
 # Choose your components for LDA and PCA
 
-components_LDA = 3
+components_LDA = 1
 
 
 # Get all files for your data set, merge them in on DataFrame and save the DataFrame to CSV
@@ -54,7 +54,7 @@ def read_files(path: str, tag: str):
         baseline_y_area = hp.baseline_correction(y)*0.05
     
         # x_values = df['RT(milliseconds)']
-        # y_values = df['TIC'].rolling(window=10).mean()
+        # y_values = df['TIC'].rolling(window=7).mean()
         # df = pd.DataFrame({'RT(milliseconds)': x_values, 'TIC': y_values})
            
         df.set_index('RT(milliseconds)', inplace=True)
@@ -85,11 +85,11 @@ def read_files(path: str, tag: str):
         
         
     merged_df.drop(merged_df.index[6601:], inplace=True)
-    merged_df.drop(merged_df.index[:600], inplace=True)
+    # merged_df.drop(merged_df.index[:600], inplace=True)
 
     df_info = pd.DataFrame(info)
     
-    threshold_percent = 0.1 # threshold in %
+    threshold_percent = 4.5 # threshold in %
     
     max_value = merged_df.max().max()
     threshold = max_value * (threshold_percent / 100)
@@ -165,7 +165,7 @@ def create_lda(path_merged_data_train: str, path_merged_data_train_info: str):
     
     
     loadings_df = pd.DataFrame(data=lda_loadings, columns=[f'LD{i+1}' for i in range(lda_loadings.shape[1])])
-    loadings_df.set_index(np.arange(180000, 780100, 100), inplace=True)
+    loadings_df.set_index(np.arange(120000, 780100, 100), inplace=True)
     print(loadings_df)
     
     loadings_df.to_csv('Scalings.csv')
@@ -212,9 +212,10 @@ def combine_data(df_test: pd.DataFrame, df_train: pd.DataFrame):
 # Plot the LDA and save the Plot
 
 def plot(df: pd.DataFrame):
-    fig = px.scatter_3d(df, x='LD1', y='LD2' , z='LD3', color=df.index, hover_name='file', symbol='Dataset', symbol_sequence= ['circle', 'diamond'])
-    fig.update_traces(marker=dict(size=5,
-                              line=dict(width=2,
+    fig = px.scatter(df, x='LD1', color=df.index, hover_name='file', symbol='Dataset', symbol_sequence= ['circle', 'diamond'])
+    fig.update_yaxes(showticklabels=False)
+    fig.update_traces(marker=dict(size=12,
+                              line=dict(width=1,
                                         color='DarkSlateGrey')),
                   selector=dict(mode='markers'))
     hp.save_html(fig, join(os.environ["ROOT_PATH"], 'plots'), 'LDA')
@@ -260,24 +261,24 @@ if __name__ == '__main__':
          os.environ["ROOT_PATH"], 'data', f'extracted_features_info_test.csv'))
     
     # Combine both LDA DataFrames
-    lda, df_lda_train_peaks, df_info = create_lda(join(
-         os.environ["ROOT_PATH"], 'data', f'extracted_peaks_train.csv'),
-         join(
-         os.environ["ROOT_PATH"], 'data', f'extracted_peaks_info_train.csv'))
+    # lda, df_lda_train_peaks, df_info = create_lda(join(
+    #      os.environ["ROOT_PATH"], 'data', f'extracted_peaks_train.csv'),
+    #      join(
+    #      os.environ["ROOT_PATH"], 'data', f'extracted_peaks_info_train.csv'))
     
-    df_lda_test_peaks, predictions = push_to_lda(lda, join(
-         os.environ["ROOT_PATH"], 'data', f'extracted_peaks_test.csv'),
-         join(
-         os.environ["ROOT_PATH"], 'data', f'extracted_peaks_info_test.csv'))
+    # df_lda_test_peaks, predictions = push_to_lda(lda, join(
+    #      os.environ["ROOT_PATH"], 'data', f'extracted_peaks_test.csv'),
+    #      join(
+    #      os.environ["ROOT_PATH"], 'data', f'extracted_peaks_info_test.csv'))
     
-    merged_df_peaks = combine_data(df_lda_train_peaks,df_lda_test_peaks)
+    #merged_df_peaks = combine_data(df_lda_train_peaks,df_lda_test_peaks)
     
     merged_df = combine_data(df_lda_test, df_lda_train)
     
     # Plot LDA
     
     plot(merged_df)
-    plot(merged_df_peaks)
+    #plot(merged_df_peaks)
     # combine both PCA DataFrames
     
     # merged_pc = combine_data(transformded_data_test, df_pca)
