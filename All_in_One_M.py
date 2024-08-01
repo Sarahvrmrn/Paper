@@ -33,8 +33,9 @@ eval_ts = datetime.now().strftime("_%m-%d-%Y_%H-%M-%S")
 os.environ["ROOT_PATH"] = hp.mkdir_ifnotexits(
     join(save_path_train, 'result' + eval_ts))
 
-components_LDA = 3
-components_PCA = 25
+components_LDA = 1
+components_PCA = 4
+
 
 
 def read_files(path: str, tag: str):
@@ -45,6 +46,13 @@ def read_files(path: str, tag: str):
 
     for file in files:
         df = hp.read_file(file, dec='.', sepi=',')[['RT(milliseconds)', 'TIC']]
+        x = df['RT(milliseconds)']
+        y = df['TIC']
+        y = hp.smooth_spectrum(y)
+        baseline = hp.baseline_correction(y)
+        y_corrected = y- baseline
+        y = hp.area_normalization(x,y_corrected)
+        baseline_y_area = hp.baseline_correction(y)*0.05
         df.set_index('RT(milliseconds)', inplace=True)
         new_index = np.arange(35700,1321860, 1)
         df = df.reindex(new_index)
@@ -65,8 +73,12 @@ def read_files(path: str, tag: str):
     merged_df.drop(merged_df.index[1080000:], inplace=True)
     merged_df.drop(merged_df.index[:144300], inplace=True)
 
-    threshold = 10
-    merged_df[merged_df <= threshold] = 0
+    def replace_below_threshold(column):
+        max_val = column.max()
+        threshold = 0.03 * max_val
+        return column.where(column >= threshold, 0)
+    
+    merged_df = merged_df.apply(replace_below_threshold)
     
     hp.save_df(merged_df, join(
         os.environ["ROOT_PATH"], 'data'), f'extracted_features_{tag}')
@@ -106,6 +118,22 @@ def create_pca(path_merged_data_train: str, path_merged_data_train_info: str):
     # plot the Loadings for each PC 
     
     pca_loadings = pca.components_
+    
+    feature_names = df.index
+    top_n = 10
+
+    # Ergebnisse für jede Hauptkomponente ausgeben
+    for i in range(components_PCA):
+        component = pca_loadings[i]
+        # Beträge der Koeffizienten und deren Indizes
+        abs_component = np.abs(component)
+        top_indices = np.argsort(abs_component)[::-1][:top_n]
+        
+        print(f"Top {top_n} Features für PC{i+1}:")
+        for index in top_indices:
+            print(f"  {feature_names[index]}: {component[index]:.4f}")
+        print()
+        
     loadings_df = pd.DataFrame(data=pca_loadings.T, columns=[f'PC{i+1}' for i in range(len(pca_loadings))])
     for column in loadings_df.columns:
         
@@ -113,9 +141,9 @@ def create_pca(path_merged_data_train: str, path_merged_data_train_info: str):
         fig.update_xaxes(title_text='RT / min',tickmode='linear', dtick=0.5)
         fig.update_traces(marker=dict(size=4))
         # Save the plot as an HTML file
-        fig.write_html(f"{column}_plot_Alle.html")
+        fig.write_html(f"{column}_plot_AlBW.html")
 
-    print("Interactive plots saved.")
+    # print("Interactive plots saved.")
     
     return pca, df_PCA, df_info
 
@@ -163,6 +191,9 @@ def create_lda(df_pca: pd.DataFrame, df_info: pd.DataFrame):
     ax.yaxis.set_ticklabels(df_pca.index.unique().tolist(), fontsize=10)
     plt.show()
     
+    cv_scores = cross_val_score(lda, X, y, cv=10)
+    print("Average cross-validation score:", cv_scores.mean())
+    
     return lda, dfLDA_train
 
 # Perform Data Reduction for your Test DataFrame with the PCA of the Training DataFrame
@@ -202,8 +233,8 @@ def combine_data(df_test: pd.DataFrame, df_train: pd.DataFrame):
 # Plot the LDA and save the Plot
 
 def plot(df: pd.DataFrame):
-    fig = px.scatter_3d(df, x='LD1', y='LD2', z='LD3', color=df.index, hover_name='file', symbol='Dataset', symbol_sequence= ['circle', 'x'])
-    fig.update_traces(marker=dict(size=5,
+    fig = px.scatter(df, x='LD1', color=df.index, hover_name='file', symbol='Dataset', symbol_sequence= ['circle', 'x'])
+    fig.update_traces(marker=dict(size=12,
                               line=dict(width=2,
                                         color='DarkSlateGrey')),
                   selector=dict(mode='markers'))

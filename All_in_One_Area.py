@@ -22,10 +22,10 @@ from sklearn.model_selection import cross_val_score
 
 # Choose the path for your data
 
-path_train = 'C:\\Users\\sverme-adm\\Desktop\\Paper'
-save_path_train = 'C:\\Users\\sverme-adm\\Desktop\\results_Paper'
+path_train = 'C:\\Users\\sverme-adm\\Desktop\\inf_ges'
+save_path_train = 'C:\\Users\\sverme-adm\\Desktop\\res_inf_ges'
 
-path_test = 'C:\\Users\\sverme-adm\\Desktop\\Paper_Test'
+path_test = 'C:\\Users\\sverme-adm\\Desktop\\inf_ges_Test'
 save_path_test = 'C:\\Users\\sverme-adm\\Desktop\\results_Paper'
 
 eval_ts = datetime.now().strftime("_%m-%d-%Y_%H-%M-%S")
@@ -35,7 +35,7 @@ os.environ["ROOT_PATH"] = hp.mkdir_ifnotexits(
 # Choose your components for LDA and PCA
 
 components_LDA = 3
-components_PCA = 40
+components_PCA = 30
 
 # Get all files for your data set, merge them in on DataFrame and save the DataFrame to CSV
 
@@ -43,66 +43,74 @@ def read_files(path: str, tag: str):
     files = hp.get_all_files_in_dir_and_sub(path)
     files = [f for f in files if f.find('.csv') >= 0]
     merged_df = pd.DataFrame()
+    merged_peak_df = pd.DataFrame()
     info = []
 
     for file in files:
         df = hp.read_file(file, dec='.', sepi=',')[['RT(milliseconds)', 'TIC']]
         x = df['RT(milliseconds)']
         y = df['TIC']
-        
-        areas = []
-        
-        for i in range(len(x)):
-            if i == 0:
-                 area = 0
-                 areas.append(area) # Set area to 0 for the first data point
-            else:
-                area = ((x[i] - x[i-1]) * (y[i] + y[i-1]) / 2)
-                areas.append(area)
-        
-        df['Area'] = areas
-        total_area = sum(df['Area'])
-        df['Normalised Area'] = (df['Area']/total_area)*1000
-        
-        df = df.drop(['TIC', 'Area',], axis=1)
-        
-        x_values = df['RT(milliseconds)']
-        y_values = df['Normalised Area'].rolling(window=25).mean()
-        df = pd.DataFrame({'RT(milliseconds)': x_values, 'Normalised Area': y_values})
-        
-        
+        y = hp.smooth_spectrum(y)
+        baseline = hp.baseline_correction(y)
+        y_corrected = y- baseline
+        y = hp.area_normalization(x,y_corrected)
+        baseline_y_area = hp.baseline_correction(y)*0.05
+    
+        # x_values = df['RT(milliseconds)']
+        # y_values = df['TIC'].rolling(window=7).mean()
+        # df = pd.DataFrame({'RT(milliseconds)': x_values, 'TIC': y_values})
+           
         df.set_index('RT(milliseconds)', inplace=True)
         new_index = np.arange(120000, 823100, 100)
         df = df.reindex(new_index)
         
-        
-
         merged_df = pd.merge(merged_df, df, how='outer', left_index=True, right_index=True)
         merged_df = merged_df.fillna(0)
-        merged_df = merged_df.rename(columns={'Normalised Area': file.split('\\')[5]})
+        merged_df = merged_df.rename(columns={'TIC': file.split('\\')[5]})
 
         info.append(
             {'Class': file.split('\\')[5], 'filename': os.path.basename(file)})
+        
+        peaks = hp.pick_peaks(y)
+        
+        peak_areas = hp.integrate_spectrum(x, y, peaks) 
+        y_corr_bl = baseline_y_area[peaks]  
+        x_peaks = x[peaks] 
+    # integrate picked peaks
+     # define list of x-values for each peak
+        peak_df = pd.DataFrame({'Peak Position Index': peaks, 'RT(milliseconds)': x_peaks, 'Peak Area': peak_areas, 'Corrected baseline': y_corr_bl})
+        peak_df = peak_df.drop(['Peak Position Index', 'Corrected baseline'], axis=1)
 
-    merged_df.drop(merged_df.index[6601:], inplace=True)
-    merged_df.drop(merged_df.index[:600], inplace=True)
+        peak_df.set_index('RT(milliseconds)', inplace=True)
+        merged_peak_df = pd.merge(merged_peak_df, peak_df, how='outer', left_index=True, right_index=True)
+        merged_peak_df = merged_peak_df.fillna(5)
+        merged_peak_df = merged_peak_df.rename(columns={'Peak Area': file.split('\\')[5]})
+        
+        
+    # merged_df.drop(merged_df.index[6601:], inplace=True)
+    # merged_df.drop(merged_df.index[:600], inplace=True)
 
     df_info = pd.DataFrame(info)
     
-    threshold_percent = 0.5 # threshold in %
-
-    # Calculate the threshold value based on the maximum value in the DataFrame
-    max_value = merged_df.max().max()
-    threshold = max_value * (threshold_percent / 100)
+    def replace_below_threshold(column):
+        max_val = column.max()
+        threshold = 0.03 * max_val
+        return column.where(column >= threshold, 0)
     
-    merged_df[merged_df <= threshold] = 0
-     
+    merged_df = merged_df.apply(replace_below_threshold)
+    
+        
     hp.save_df(merged_df, join(
         os.environ["ROOT_PATH"], 'data'), f'extracted_features_{tag}')
     hp.save_df(df_info, join(
         os.environ["ROOT_PATH"], 'data'), f'extracted_features_info_{tag}')
-   
     
+    hp.save_df(merged_peak_df, join(
+        os.environ["ROOT_PATH"], 'data'), f'extracted_peaks_{tag}')
+    hp.save_df(df_info, join(
+        os.environ["ROOT_PATH"], 'data'), f'extracted_peaks_info_{tag}')
+   
+   
 
 # Perform Data Reduction with PCA on your Training DataFrame
 
@@ -136,6 +144,25 @@ def create_pca(path_merged_data_train: str, path_merged_data_train_info: str):
     # plot the Loadings for each PC 
     
     pca_loadings = pca.components_
+    
+    feature_names = df.index
+    
+    # Anzahl der wichtigsten Features, die du sehen möchtest
+    top_n = 15
+
+    # Ergebnisse für jede Hauptkomponente ausgeben
+    for i in range(components_PCA):
+        component = pca_loadings[i]
+        # Beträge der Koeffizienten und deren Indizes
+        abs_component = np.abs(component)
+        top_indices = np.argsort(abs_component)[::-1][:top_n]
+        
+        print(f"Top {top_n} Features für PC{i+1}:")
+        for index in top_indices:
+            print(f"  {feature_names[index]}: {component[index]:.4f}")
+        print()
+    
+        
     loadings_df = pd.DataFrame(data=pca_loadings.T, columns=[f'PC{i+1}' for i in range(len(pca_loadings))])
     #loadings_df.set_index(np.arange(120000, 832200, 100), inplace=True)
     #loadings_df.to_csv('Loadings.csv')
@@ -237,7 +264,7 @@ def combine_data(df_test: pd.DataFrame, df_train: pd.DataFrame):
 # Plot the LDA and save the Plot
 
 def plot(df: pd.DataFrame):
-    fig = px.scatter_3d(df, x='LD1', y='LD2', z='LD3',  color=df.index, hover_name='file', symbol='Dataset', symbol_sequence= ['circle', 'diamond'])
+    fig = px.scatter_3d(df, x='LD1', y='LD2', z='LD3', color=df.index, hover_name='file', symbol='Dataset', symbol_sequence= ['circle', 'diamond'])
     fig.update_traces(marker=dict(size=5,
                               line=dict(width=2,
                                         color='DarkSlateGrey')),
@@ -302,10 +329,10 @@ if __name__ == '__main__':
     
     # combine both PCA DataFrames
     
-    merged_pc = combine_data(transformded_data_test, df_pca)
+    # merged_pc = combine_data(transformded_data_test, df_pca)
     
-    pca_loadings = pca.components_
-    loadings_df = pd.DataFrame(data=pca_loadings.T, columns=[f'PC{i+1}' for i in range(len(pca_loadings))])
+    # pca_loadings = pca.components_
+    # loadings_df = pd.DataFrame(data=pca_loadings.T, columns=[f'PC{i+1}' for i in range(len(pca_loadings))])
     
     
     # plot PCA

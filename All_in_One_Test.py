@@ -84,19 +84,19 @@ def read_files(path: str, tag: str):
         merged_peak_df = merged_peak_df.rename(columns={'Peak Area': file.split('\\')[5]})
         
         
-    merged_df.drop(merged_df.index[6601:], inplace=True)
+    # merged_df.drop(merged_df.index[6601:], inplace=True)
     # merged_df.drop(merged_df.index[:600], inplace=True)
 
     df_info = pd.DataFrame(info)
     
-    threshold_percent = 4.5 # threshold in %
+    def replace_below_threshold(column):
+        max_val = column.max()
+        threshold = 0.2 * max_val
+        return column.where(column >= threshold, 0)
     
-    max_value = merged_df.max().max()
-    threshold = max_value * (threshold_percent / 100)
+    merged_df = merged_df.apply(replace_below_threshold)
     
-    merged_df[merged_df <= threshold] = 0
-
-    
+        
     hp.save_df(merged_df, join(
         os.environ["ROOT_PATH"], 'data'), f'extracted_features_{tag}')
     hp.save_df(df_info, join(
@@ -132,6 +132,22 @@ def create_lda(path_merged_data_train: str, path_merged_data_train_info: str):
     dfLDA_train.index = y
 
     lda_likelihood = lda.score(X, y)
+    coefficients = lda.coef_
+    feature_names = df.T.index
+
+    # Durchschnittliche Beitrag der Features berechnen
+    feature_contributions = np.abs(coefficients).mean(axis=0)
+
+    # Ergebnisse in einem DataFrame darstellen
+    feature_contributions_df = pd.DataFrame({
+        'Feature': feature_names,
+        'Contribution': feature_contributions
+    })
+
+# DataFrame nach Beitrag sortieren
+    feature_contributions_df = feature_contributions_df.sort_values(by='Contribution', ascending=False)
+
+    print(feature_contributions_df)
 
     # Perform Cross Validation on your LDA (Get confusion matrix)
        
@@ -165,14 +181,14 @@ def create_lda(path_merged_data_train: str, path_merged_data_train_info: str):
     
     
     loadings_df = pd.DataFrame(data=lda_loadings, columns=[f'LD{i+1}' for i in range(lda_loadings.shape[1])])
-    loadings_df.set_index(np.arange(120000, 780100, 100), inplace=True)
+    loadings_df.set_index(np.arange(120000, 823100, 100), inplace=True)
     print(loadings_df)
     
     loadings_df.to_csv('Scalings.csv')
 
     for column in loadings_df.columns:
         
-        fig = px.line(loadings_df, x=loadings_df.index/60000, y=column, title=f"{column} Plot")
+        fig = px.line(loadings_df, x=loadings_df.index, y=column, title=f"{column} Plot")
         fig.update_xaxes(title_text='RT / min',tickmode='linear', dtick=0.5)
         fig.update_traces(marker=dict(size=4))
         # Save the plot as an HTML file
