@@ -34,7 +34,7 @@ os.environ["ROOT_PATH"] = hp.mkdir_ifnotexits(
     join(save_path_train, 'result' + eval_ts))
 
 components_LDA = 1
-components_PCA = 4
+components_PCA = 3
 
 
 
@@ -141,7 +141,7 @@ def create_pca(path_merged_data_train: str, path_merged_data_train_info: str):
         fig.update_xaxes(title_text='RT / min',tickmode='linear', dtick=0.5)
         fig.update_traces(marker=dict(size=4))
         # Save the plot as an HTML file
-        fig.write_html(f"{column}_plot_AlBW.html")
+        fig.write_html(f"{column}_plot_WGes.html")
 
     # print("Interactive plots saved.")
     
@@ -233,9 +233,9 @@ def combine_data(df_test: pd.DataFrame, df_train: pd.DataFrame):
 # Plot the LDA and save the Plot
 
 def plot(df: pd.DataFrame):
-    fig = px.scatter(df, x='LD1', color=df.index, hover_name='file', symbol='Dataset', symbol_sequence= ['circle', 'x'])
+    fig = px.scatter(df, x='LD1', color=df.index, hover_name='file', symbol='Dataset', symbol_sequence= ['circle', 'diamond'])
     fig.update_traces(marker=dict(size=12,
-                              line=dict(width=2,
+                              line=dict(width=1,
                                         color='DarkSlateGrey')),
                   selector=dict(mode='markers'))
     hp.save_html(fig, join(os.environ["ROOT_PATH"], 'plots'), 'LDA')
@@ -291,6 +291,7 @@ if __name__ == '__main__':
     # Combine both LDA DataFrames
     
     merged_df = combine_data(df_lda_test, df_lda_train)
+    merged_df.to_csv('LDA_data.csv', index=False)
     
     # Plot LDA
     

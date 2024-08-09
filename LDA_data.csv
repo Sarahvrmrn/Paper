@@ -1,0 +1,47 @@
+LD1,file,Dataset
+-2.003209973209307,2014-07-17_Weide_02_TTa_92 min.csv,train
+-2.2346007987366616,2014-07-17_Weide_04_TTa_96 min.csv,train
+-2.4259351998895307,2014-07-18_Weide_01_TGr_91 min.csv,train
+-2.0760762128915125,2014-07-18_Weide_05_TGr_89 min.csv,train
+-2.723880152916019,2014-07-23_Ahorn_01_Baum_3-1_TGr_84 min.csv,train
+-3.5646799049305327,2014-07-23_Pappel_01_TTa_90 min.csv,train
+-0.08228829557362191,2014-07-24 Ahron05 Baum-5-1 TTa 76min SP.csv,train
+-1.7171802919853205,2014-07-24_Pappel_04_TGr_85 min.csv,train
+-1.015910956399492,2014-07-30_Pappel_02_TGr_82 min.csv,train
+-1.8951803843553117,2014-10-28Ahron im Q-Raum GilAir 90minTGr02 -RM.csv,train
+3.398157532907725,2015-06-25 Pappelbock Larve 90min TTa03-RM.csv,train
+1.296788924770607,2015-06-26  Pappelbock 90min TGr02-RM.csv,train
+0.8054889149134299,2015-07-13 Pappelbock Larve V1 98min TTa02-RM.csv,train
+0.8851161857501955,2015-07-13Pappelbock Larve V1 90min TGr03-RM.csv,train
+0.7598316173273592,2015-07-15 pappelbock Larve 93min TTa02-RM.csv,train
+1.8148108653219546,2016-02-18 Puppe Pappelb lebend 92min TTa-RM.csv,train
+3.065247394189838,2017-01-11PappelbockiAcer 90min Tta02-RM.csv,train
+3.1962325115738834,2017-01-11PappelbockiAcer 93min Tta03-RM.csv,train
+2.8379145880261487,2017-01-12PappelbiAcer 90min TTa-RM.csv,train
+1.6793536361061652,2017-01-12PappelbockiAcer 100min TTa04-RM.csv,train
+-2.764565317047289,2014-07-17_Weide_01_TTa_93 min.csv,test
+-1.649284195541873,2014-07-17_Weide_03_TTa_92 min.csv,test
+-0.6157481152772828,2014-07-17_Weide_05_TTa_97 min.csv,test
+-2.5938926910357027,2014-07-18_Weide_02_TGr_TGr_95 min.csv,test
+-2.4954787705306103,2014-07-18_Weide_03_TGr_95 min.csv,test
+-3.178758749911433,2014-07-18_Weide_04_TGr_88 min.csv,test
+-0.9686888472359324,2014-07-23_Ahorn_02_Baum_4-1_TGr_85 min.csv,test
+-2.959407469161586,2014-07-23_Ahorn_03_Baum_3-2_TGr_81 min.csv,test
+-0.41273253317705955,2014-07-23_Ahorn_04_Baum_4-2_TGr_81 min.csv,test
+-0.4015370528137748,2014-07-23_Pappel_02_TTa_90 min.csv,test
+-2.064979904593331,2014-07-23_Pappel_03_TTa_90 min.csv,test
+-1.3639342487750912,2014-07-24 Ahron02 Baum-4-1 TTa 87min LP.csv,test
+-1.3054253936858737,2014-07-24_Pappel_01_TGr_82 min.csv,test
+-0.3791697324989082,2014-07-24_Pappel_02_TGr_82 min.csv,test
+-1.4788121606674265,2014-07-30_Pappel_01_TGr_85 min.csv,test
+-0.8462373749142944,2014-10-28Ahron im Q-Raum GilAir 90min TTa-RM.csv,test
+-0.7431654240233964,2014-10-28Ahron im Q-Raum GilAir 90min TTa04-RM.csv,test
+-1.6439819202332553,2014-10-28Ahron im Q-Raum LFP 90min TGr03-RM.csv,test
+-1.5097874743612203,2014-10-28Ahron im Q-Raum LFP 91min TTa-RM.csv,test
+0.8660611042177566,2015-06-16Pappelbock Larve 90min TTa02-RM.csv,test
+1.5368763192247112,2015-06-26  Pappelbock 92min TTa-RM.csv,test
+1.0846911968536752,2015-07-13Pappelboch Larve V1 88min Tta04-RM.csv,test
+3.9033106110162956,2016-02-18 Pappelbock Puppe lebend 95min TTa-RM.csv,test
+1.5251368068536149,2016-02-18Späne Puppenwiege Pappelb 92min TTa-RM.csv,test
+2.813308204105172,2017-01-11PappelbockiAcer 94min Tta-RM.csv,test
+3.1219149029547264,2017-01-12PappelbiAcer 90min TTa03-RM.csv,test
